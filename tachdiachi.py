@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 import json
 import re
+import random
 import google.generativeai as genai
 
 # ==============================================================================
