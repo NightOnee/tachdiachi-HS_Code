@@ -28,7 +28,7 @@ def call_gemini_api(prompt_template, user_input):
 
         # B2: Khởi tạo mô hình
         # Sử dụng Gemma 3 27B cho các tác vụ xử lý văn bản phức tạp
-        model = genai.GenerativeModel('gemma-3-27b-it')
+        model = genai.GenerativeModel('gemma-4-26b-a4b-it')
 
         # B3: Tạo prompt hoàn chỉnh
         full_prompt = prompt_template.format(user_input=user_input)
