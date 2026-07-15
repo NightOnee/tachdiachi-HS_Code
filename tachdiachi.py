@@ -2,43 +2,42 @@ import streamlit as st
 import pandas as pd
 import json
 import re
-import random
-import google.generativeai as genai
+import openai
 
 # ==============================================================================
-# PHẦN BACK-END: GỌI API CỦA GOOGLE GEMINI
-# ==============================================================================
+# PHẦN BACK-END: GỌI API CỦA OPENROUTER
+# ============================================================================== 
 
-def call_gemini_api(prompt_template, user_input):
+def call_openrouter_api(prompt_template, user_input):
     """
-    Hàm gọi API của Google Gemini và xử lý kết quả trả về.
+    Hàm gọi API của OpenRouter và xử lý kết quả trả về.
     """
     try:
-        # B1: Lấy tất cả các API key có trong file secrets và chọn ngẫu nhiên một key
-        # Các key trong file secrets.toml phải có dạng GEMINI_API_KEY_1, GEMINI_API_KEY_2, ...
-        api_keys = [value for key, value in st.secrets.items() if key.startswith("GEMINI_API_KEY_")]
+        # B1: Lấy API key duy nhất từ file secrets
+        # API key trong file secrets.toml phải có tên OPENROUTER_API_KEY
+        selected_api_key = st.secrets.get("OPENROUTER_API_KEY")
         
-        if not api_keys:
-            st.error("Không tìm thấy API key nào có định dạng 'GEMINI_API_KEY_...' trong file secrets.toml.")
+        if not selected_api_key:
+            st.error("Không tìm thấy API key 'OPENROUTER_API_KEY' trong file secrets.toml.")
             return {"error": "Lỗi cấu hình API Key."}
-            
-        selected_api_key = random.choice(api_keys)
-        genai.configure(api_key=selected_api_key)
 
-
-        # B2: Khởi tạo mô hình
-        # Sử dụng Gemma 3 27B cho các tác vụ xử lý văn bản phức tạp
-        model = genai.GenerativeModel('gemma-4-26b-a4b-it')
+        openai.api_key = selected_api_key
+        openai.api_base = "https://openrouter.ai/api/v1"
+        model = "openrouter/free"
 
         # B3: Tạo prompt hoàn chỉnh
         full_prompt = prompt_template.format(user_input=user_input)
 
-        # B4: Gửi yêu cầu đến Gemini
-        response = model.generate_content(full_prompt)
+        # B4: Gửi yêu cầu đến OpenRouter
+        response = openai.ChatCompletion.create(
+            model=model,
+            messages=[{"role": "user", "content": full_prompt}],
+            temperature=0.2,
+            max_tokens=1200
+        )
         
         # B5: Xử lý và bóc tách JSON từ kết quả trả về
-        # Gemini thường trả về JSON trong một khối mã markdown, cần phải bóc tách nó ra.
-        response_text = response.text
+        response_text = response.choices[0].message.content
         
         # Cố gắng tìm khối JSON được bao bọc bởi ```json ... ```
         match = re.search(r"```json\n(.*?)\n```", response_text, re.DOTALL)
@@ -53,7 +52,7 @@ def call_gemini_api(prompt_template, user_input):
 
     except Exception as e:
         # Bắt các lỗi có thể xảy ra (API key sai, lỗi mạng, v.v.)
-        st.error(f"Đã xảy ra lỗi khi gọi API của Gemini: {e}")
+        st.error(f"Đã xảy ra lỗi khi gọi API của OpenRouter: {e}")
         return {"error": str(e)}
 
 
@@ -63,7 +62,7 @@ def call_gemini_api(prompt_template, user_input):
 
 st.set_page_config(page_title="Trợ lý Xử lý Thông tin Xuất khẩu", layout="wide")
 
-st.title("🚀 Trợ lý Xử lý Thông tin Xuất khẩu (với Gemini AI)")
+st.title("🚀 Trợ lý Xử lý Thông tin Xuất khẩu (với OpenRouter AI)")
 st.markdown("Ứng dụng này hỗ trợ hai tác vụ: **chuẩn hóa địa chỉ quốc tế** và **hoàn thiện thông tin hàng hóa xuất khẩu**.")
 
 # --- B1: NGƯỜI DÙNG CHỌN VẤN ĐỀ VÀ ĐIỀN YÊU CẦU ---
@@ -94,7 +93,7 @@ if app_mode == "1. Chuẩn hóa Địa chỉ":
 
                 Input address: '{user_input}'
                 """
-                response_data = call_gemini_api(address_prompt, address_input)
+                response_data = call_openrouter_api(address_prompt, address_input)
 
                 st.subheader("Kết quả phân tích địa chỉ:")
                 if "error" not in response_data:
@@ -105,7 +104,7 @@ if app_mode == "1. Chuẩn hóa Địa chỉ":
                     col1.markdown(f"**Mã bưu chính:** `{response_data.get('postal_code', 'N/A')}`")
                     col2.markdown(f"**Thành phố:** `{response_data.get('city', 'N/A')}`")
                     col2.markdown(f"**Bang/Tỉnh:** `{response_data.get('state', 'N/A')}`")
-                # Không cần hiển thị lỗi ở đây vì hàm call_gemini_api đã dùng st.error
+                # Không cần hiển thị lỗi ở đây vì hàm call_openrouter_api đã dùng st.error
         else:
             st.warning("Vui lòng nhập một địa chỉ để xử lý.")
 
@@ -136,7 +135,7 @@ elif app_mode == "2. Hoàn thiện Thông tin Hàng hóa":
                 User's product list:
                 {user_input}
                 """
-                response_data = call_gemini_api(products_prompt, products_input)
+                response_data = call_openrouter_api(products_prompt, products_input)
 
                 st.subheader("Bảng thông tin hàng hóa chi tiết:")
                 if "error" not in response_data and isinstance(response_data, list):
@@ -152,7 +151,7 @@ elif app_mode == "2. Hoàn thiện Thông tin Hàng hóa":
                     df = df[df_cols]
                     df.insert(0, 'STT', range(1, 1 + len(df)))
                     st.dataframe(df, use_container_width=True)
-                # Không cần hiển thị lỗi ở đây vì hàm call_gemini_api đã dùng st.error
+                # Không cần hiển thị lỗi ở đây vì hàm call_openrouter_api đã dùng st.error
         else:
             st.warning("Vui lòng nhập danh sách hàng hóa để xử lý.")
 
