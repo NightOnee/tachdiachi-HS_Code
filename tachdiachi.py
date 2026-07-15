@@ -21,15 +21,17 @@ def call_openrouter_api(prompt_template, user_input):
             st.error("Không tìm thấy API key 'OPENROUTER_API_KEY' trong file secrets.toml.")
             return {"error": "Lỗi cấu hình API Key."}
 
-        openai.api_key = selected_api_key
-        openai.api_base = "https://openrouter.ai/api/v1"
+        client = openai.OpenAI(
+            api_key=selected_api_key,
+            base_url="https://openrouter.ai/api/v1"
+        )
         model = "openrouter/free"
 
         # B3: Tạo prompt hoàn chỉnh
         full_prompt = prompt_template.format(user_input=user_input)
 
         # B4: Gửi yêu cầu đến OpenRouter
-        response = openai.ChatCompletion.create(
+        response = client.chat.completions.create(
             model=model,
             messages=[{"role": "user", "content": full_prompt}],
             temperature=0.2,
@@ -37,7 +39,11 @@ def call_openrouter_api(prompt_template, user_input):
         )
         
         # B5: Xử lý và bóc tách JSON từ kết quả trả về
-        response_text = response.choices[0].message.content
+        response_message = response.choices[0].message
+        if isinstance(response_message, dict):
+            response_text = response_message.get("content", "")
+        else:
+            response_text = getattr(response_message, "content", "")
         
         # Cố gắng tìm khối JSON được bao bọc bởi ```json ... ```
         match = re.search(r"```json\n(.*?)\n```", response_text, re.DOTALL)
